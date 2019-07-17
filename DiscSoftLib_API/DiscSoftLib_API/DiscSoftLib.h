@@ -61,6 +61,13 @@ struct FeatureState {
 	int TrialDaysLeft;
 };
 
+struct ActivationLicenseInfo
+{
+	LicenseType licenseType;
+	WCHAR serial[33];
+	WCHAR email[256];
+};
+
 struct LicenseCheckResult {
 	LicenseCheckingResultEnum Result;
 	int IsSuccessResult;
@@ -112,7 +119,6 @@ struct LicenseInfo {
 	FeatureState FeaturesStates[50];
 };
 
-FARPROC fpActivateLicense;
 FARPROC fpActivateTrialFeature;
 FARPROC fpCheckForUpdate;
 FARPROC fpClearHTMLOffer;
@@ -120,6 +126,9 @@ FARPROC fpGetHTMLOffer;
 FARPROC fpGetUserId;
 FARPROC fpIsHTMLOfferExist;
 FARPROC fpSetFileUsersFullAccess;
+
+typedef bool(*detour_ActivateLicense)(ActivationLicenseInfo &licenseInfo, LicenseCheckResult &licenseCheckResult);
+detour_ActivateLicense fpActivateLicense;
 
 typedef bool(*detour_CheckLicense)(bool forceOnlineCheck, LicenseCheckResult &licenseCheckResult);
 detour_CheckLicense fpCheckLicense;
@@ -132,7 +141,7 @@ detour_GetLicenseInfo fpGetLicenseInfo;
 void DiscSoftLib_Init()
 {
 	HMODULE hModule = LoadLibrary(DiscSoftLib);
-	fpActivateLicense = GetProcAddress(hModule, "ActivateLicense");
+	fpActivateLicense = (detour_ActivateLicense)GetProcAddress(hModule, "ActivateLicense");
 	fpActivateTrialFeature = GetProcAddress(hModule, "ActivateTrialFeature");
 	fpCheckForUpdate = GetProcAddress(hModule, "CheckForUpdate");
 	fpCheckLicense = (detour_CheckLicense)GetProcAddress(hModule, "CheckLicense");
@@ -144,14 +153,26 @@ void DiscSoftLib_Init()
 	fpSetFileUsersFullAccess = GetProcAddress(hModule, "SetFileUsersFullAccess");
 }
 
-extern "C" __declspec(dllexport) void ActivateLicense() { fpActivateLicense(); }
+extern "C" __declspec(dllexport) bool ActivateLicense(ActivationLicenseInfo &licenseInfo, LicenseCheckResult &licenseCheckResult)
+{
+	return fpActivateLicense(licenseInfo, licenseCheckResult);
+}
 extern "C" __declspec(dllexport) void ActivateTrialFeature() { fpActivateTrialFeature(); }
 extern "C" __declspec(dllexport) void CheckForUpdate() { fpCheckForUpdate(); }
 extern "C" __declspec(dllexport) bool CheckLicense(bool forceOnlineCheck, LicenseCheckResult &licenseCheckResult)
 {
 	bool bStat = fpCheckLicense(forceOnlineCheck, licenseCheckResult);
-	for (int i = 0; i < licenseCheckResult.FeaturesCount; i++)
+	if (licenseCheckResult.FeaturesCount == 0) {
+		LicenseCheckResult _licenseCheckResult;
+		fpCheckLicense(true, _licenseCheckResult);
+		ActivationLicenseInfo _activationLicenseInfo;
+		_activationLicenseInfo.licenseType = LicenseType::ltTrial;
+		fpActivateLicense(_activationLicenseInfo, _licenseCheckResult);
+	}
+	licenseCheckResult.Result = LicenseCheckingResultEnum::lcrSuccess;
+	for (int i = 0; i < licenseCheckResult.FeaturesCount; i++) {
 		licenseCheckResult.FeaturesStates[i].licenseStatus = FeatureLicenseStatus::flsPaid;
+	}
 	return bStat;
 }
 extern "C" __declspec(dllexport) void ClearHTMLOffer() { fpClearHTMLOffer(); }
@@ -159,8 +180,13 @@ extern "C" __declspec(dllexport) void GetHTMLOffer() { fpGetHTMLOffer(); }
 extern "C" __declspec(dllexport) void GetLicenseInfo(LicenseInfo &pInstanceInfo)
 {
 	fpGetLicenseInfo(pInstanceInfo);
-	pInstanceInfo.TrialDaysLeft = 365;
+	pInstanceInfo.License = LicenseType::ltPaid;
+	lstrcpy(pInstanceInfo.Serial, L"Crack By ˆ¢cŽe");
 }
 extern "C" __declspec(dllexport) void GetUserId() { fpGetUserId(); }
-extern "C" __declspec(dllexport) void IsHTMLOfferExist() { fpIsHTMLOfferExist(); }
+extern "C" __declspec(dllexport) bool IsHTMLOfferExist(bool &exists)
+{
+	exists = false;
+	return true;
+}
 extern "C" __declspec(dllexport) void SetFileUsersFullAccess() { fpSetFileUsersFullAccess(); }
