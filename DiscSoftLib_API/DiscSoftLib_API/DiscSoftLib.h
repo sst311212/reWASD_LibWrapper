@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <stdio.h>
 #include <Windows.h>
 
@@ -136,11 +136,29 @@ detour_CheckLicense fpCheckLicense;
 typedef void(*detour_GetLicenseInfo)(LicenseInfo &pInstanceInfo);
 detour_GetLicenseInfo fpGetLicenseInfo;
 
-#define DiscSoftLib L"DiscSoftLi_.dll"
+#define DiscSoftLib L"_DiscSoftLib.dll"
 
 void DiscSoftLib_Init()
 {
-	HMODULE hModule = LoadLibrary(DiscSoftLib);
+	WCHAR lpLibPath[260];
+	GetModuleHandle(lpLibPath);
+	for (int i = lstrlen(lpLibPath) - 1; i >= 0; i++) {
+		if (lpLibPath[i] == L'\\') {
+			lpLibPath[i + 1] = 0;
+			break;
+		}
+	}
+	lstrcat(lpLibPath, DiscSoftLib);
+	GetFileAttributes(lpLibPath);
+	if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+		MessageBox(NULL, L"找不到 _DiscSoftLib.dll 檔案。", L"reWASD", MB_ICONERROR);
+		ExitProcess(0);
+	}
+	HMODULE hModule = LoadLibrary(lpLibPath);
+	if (hModule == NULL) {
+		MessageBox(NULL, L"無法載入 _DiscSoftLib.dll 檔案。", L"reWASD", MB_ICONERROR);
+		ExitProcess(0);
+	}
 	fpActivateLicense = (detour_ActivateLicense)GetProcAddress(hModule, "ActivateLicense");
 	fpActivateTrialFeature = GetProcAddress(hModule, "ActivateTrialFeature");
 	fpCheckForUpdate = GetProcAddress(hModule, "CheckForUpdate");
@@ -181,7 +199,7 @@ extern "C" __declspec(dllexport) void GetLicenseInfo(LicenseInfo &pInstanceInfo)
 {
 	fpGetLicenseInfo(pInstanceInfo);
 	pInstanceInfo.License = LicenseType::ltPaid;
-	lstrcpy(pInstanceInfo.Serial, L"Crack By ���c�e");
+	lstrcpy(pInstanceInfo.Serial, L"Crack By 阿皇仔");
 }
 extern "C" __declspec(dllexport) void GetUserId() { fpGetUserId(); }
 extern "C" __declspec(dllexport) bool IsHTMLOfferExist(bool &exists)
