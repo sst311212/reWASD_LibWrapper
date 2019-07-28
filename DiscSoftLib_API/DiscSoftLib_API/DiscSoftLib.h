@@ -141,8 +141,8 @@ detour_GetLicenseInfo fpGetLicenseInfo;
 void DiscSoftLib_Init()
 {
 	WCHAR lpLibPath[260];
-	GetModuleHandle(lpLibPath);
-	for (int i = lstrlen(lpLibPath) - 1; i >= 0; i++) {
+	GetModuleFileName(NULL, lpLibPath, 260);
+	for (int i = lstrlen(lpLibPath) - 1; i >= 0; i--) {
 		if (lpLibPath[i] == L'\\') {
 			lpLibPath[i + 1] = 0;
 			break;
